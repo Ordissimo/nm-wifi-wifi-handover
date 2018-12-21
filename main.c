@@ -13,7 +13,7 @@ int main(int argc, char const *argv[]) {
   NMClient *client;
   GError *error = NULL;
   if (!(client = nm_client_new(NULL, &error))) {
-    g_error("Could not connect to NetworkManager: %s.", error->message);
+    g_error("Could not connect to NetworkManager: %s\n", error->message);
     g_error_free(error);
     return EXIT_FAILURE;
   }
