@@ -1,10 +1,12 @@
 #include "./dev_states.h"
 #include <stdio.h>
 
-static gint comp_ap_by_strength(NMAccessPoint *a, NMAccessPoint *b) {
-  guint8 strength_a = nm_access_point_get_strength(a);
-  guint8 strength_b = nm_access_point_get_strength(b);
-  return b - a;
+static gint comp_ap_by_strength(gpointer a, gpointer b) {
+  NMAccessPoint *ap_a = *(NMAccessPoint **)a;
+  NMAccessPoint *ap_b = *(NMAccessPoint **)b;
+  guint8 strength_a = nm_access_point_get_strength(ap_a);
+  guint8 strength_b = nm_access_point_get_strength(ap_b);
+  return strength_b - strength_a;
 }
 
 static void connect_ap_cb(NMClient *client, GAsyncResult *res,
