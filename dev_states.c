@@ -67,7 +67,7 @@ void dev_states_check_swap(DevStates *dev_states) {
       dev_states->mdev = device;
       dev_states->init_mdev_ap_strength = strength;
       dev_states->mdev_handler_id =
-          g_signal_connect(device, "notify::strength",
+          g_signal_connect(ap, "notify::strength",
                            (GCallback)notify_strength_cb, dev_states);
       const char *iface = nm_device_get_iface((NMDevice *)device);
       g_debug("mdev is changed to the device(iface: %s)\n", iface);
