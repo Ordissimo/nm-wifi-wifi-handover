@@ -17,6 +17,6 @@ format:
 	done
 
 clean:
-	rm $(PROJECT)
+	rm $(PROGRAM) $(OBJS)
 
 .PHONY: clean format
