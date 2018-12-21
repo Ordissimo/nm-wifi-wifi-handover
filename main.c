@@ -30,7 +30,7 @@ int main(int argc, char const *argv[]) {
     if (type == NM_DEVICE_TYPE_WIFI) {
       const char *iface = nm_device_get_iface(device);
       g_ptr_array_add(dev_states.devs, device);
-      g_debug("device added (interface name: %s)", iface);
+      g_debug("device added (iface: %s)\n", iface);
     }
   }
 
