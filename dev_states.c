@@ -67,7 +67,7 @@ void dev_states_check_swap(DevStates *dev_states) {
       dev_states->mdev_handler_id =
           g_signal_connect(device, "notify::strength",
                            (GCallback)notify_strength_cb, dev_states);
-      const char *iface = nm_device_get_iface(device);
+      const char *iface = nm_device_get_iface((NMDevice *)device);
       g_debug("mdev is changed to the device(iface: %s)\n", iface);
     }
   }
@@ -159,7 +159,7 @@ void dev_states_scan_cb(NMDeviceWifi *device, GAsyncResult *res,
   NMAccessPoint *cur_ap = nm_device_wifi_get_active_access_point(device);
   NMAccessPoint *ap = dev_states_find_dev_ap(dev_states, device, aps);
   if (ap != NULL && ap != cur_ap) {
-    const char *iface = nm_device_get_iface(device);
+    const char *iface = nm_device_get_iface((NMDevice *)device);
     GBytes *ssid = nm_access_point_get_ssid(ap);
     g_debug("trying to connect to an AP(iface: %s, ssid: %s)\n", iface,
             (char *)g_bytes_get_data(ssid, NULL));
