@@ -179,6 +179,6 @@ void dev_states_request_scan(DevStates *dev_states) {
   for (int i = 0; i < dev_states->devs->len; i++) {
     NMDeviceWifi *device = dev_states->devs->pdata[i];
     nm_device_wifi_request_scan_async(
-        device, NULL, (GAsyncReadyCallback)dev_states_scan_cb, &dev_states);
+        device, NULL, (GAsyncReadyCallback)dev_states_scan_cb, dev_states);
   }
 }
