@@ -2,6 +2,7 @@
 #include <NetworkManager.h>
 #include <glib.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 DevStates dev_states;
 

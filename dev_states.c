@@ -1,5 +1,6 @@
 #include "./dev_states.h"
 #include <stdio.h>
+#include <string.h>
 
 static gint comp_ap_by_strength(gpointer a, gpointer b) {
   NMAccessPoint *ap_a = *(NMAccessPoint **)a;
