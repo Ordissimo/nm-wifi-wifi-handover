@@ -13,7 +13,7 @@ int main(int argc, char const *argv[]) {
   NMClient *client;
   GError *error = NULL;
   if (!(client = nm_client_new(NULL, &error))) {
-    g_print("Error: Could not connect to NetworkManager: %s.", error->message);
+    g_error("Could not connect to NetworkManager: %s.", error->message);
     g_error_free(error);
     return EXIT_FAILURE;
   }
@@ -28,7 +28,9 @@ int main(int argc, char const *argv[]) {
     NMDevice *device = devices->pdata[i];
     NMDeviceType type = nm_device_get_device_type(device);
     if (type == NM_DEVICE_TYPE_WIFI) {
+      const char *iface = nm_device_get_iface(device);
       g_ptr_array_add(dev_states.devs, device);
+      g_debug("device added (interface name: %s)", iface);
     }
   }
 

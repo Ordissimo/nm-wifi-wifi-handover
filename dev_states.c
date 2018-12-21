@@ -14,14 +14,24 @@ static void connect_ap_cb(NMClient *client, GAsyncResult *res,
 
 static void notify_strength_cb(NMAccessPoint *ap, GParamSpec *spec,
                                DevStates *dev_states) {
-  dev_states_check_swap(dev_states);
+  GBytes *ssid = nm_access_point_get_ssid(ap);
   guint8 strength = nm_access_point_get_strength(ap);
-  if (dev_states->init_mdev_ap_strength * 0.8 >= strength) {
+  g_debug("strength of the AP changed(ssid: %s, strength: %d)",
+          (char *)g_bytes_get_data(ssid, NULL), strength);
+  dev_states_check_swap(dev_states);
+
+  NMAccessPoint *main_ap =
+      dev_states->mdev != NULL
+          ? nm_device_wifi_get_active_access_point(dev_states->mdev)
+          : NULL;
+  if (main_ap == ap && dev_states->init_mdev_ap_strength * 0.8 >= strength) {
+    g_debug("strength of mdev's AP is decreasing");
     dev_states_request_scan(dev_states);
   }
 }
 
 void dev_states_check_swap(DevStates *dev_states) {
+  g_debug("checking whether need to swap device role");
   NMAccessPoint *main_ap =
       dev_states->mdev != NULL
           ? nm_device_wifi_get_active_access_point(dev_states->mdev)
@@ -40,7 +50,11 @@ void dev_states_check_swap(DevStates *dev_states) {
     }
 
     guint8 strength = nm_access_point_get_strength(ap);
+    GBytes *ssid = nm_access_point_get_ssid(ap);
     if (strength > main_strength) {
+      g_debug(
+          "strength of the sdev's AP (ssid: %s, strength: %d) is higher now",
+          (char *)g_bytes_get_data(ssid, NULL), strength);
       NMDeviceWifi *old_mdev = dev_states->mdev;
       if (old_mdev != NULL) {
         NMAccessPoint *old_mdev_ap =
@@ -53,6 +67,8 @@ void dev_states_check_swap(DevStates *dev_states) {
       dev_states->mdev_handler_id =
           g_signal_connect(device, "notify::strength",
                            (GCallback)notify_strength_cb, dev_states);
+      const char *iface = nm_device_get_iface(device);
+      g_debug("mdev is changed to the device(iface: %s)", iface);
     }
   }
 }
@@ -103,28 +119,36 @@ NMAccessPoint *dev_states_find_dev_ap(DevStates *dev_states,
     return aps->pdata[0];
   }
 
+  NMAccessPoint *cur_ap = nm_device_wifi_get_active_access_point(device);
+  guint8 cur_ap_strength =
+      cur_ap != NULL ? nm_access_point_get_strength(cur_ap) : 0;
+  const char *cur_ap_bssid =
+      cur_ap != NULL ? nm_access_point_get_bssid(cur_ap) : NULL;
+
   // calc threshold
   NMAccessPoint *main_ap =
       nm_device_wifi_get_active_access_point(dev_states->mdev);
   guint8 threshold = nm_access_point_get_strength(main_ap) * 0.8;
-
   const char *main_bssid = nm_access_point_get_bssid(main_ap);
-  gboolean connected = FALSE;
   for (int i = 0; i < aps->len; i++) {
     NMAccessPoint *ap = aps->pdata[i];
-    const char *ap_bssid = nm_access_point_get_bssid(aps->pdata[0]);
-    guint8 ap_strength = nm_access_point_get_strength(aps->pdata[0]);
-    if (strcmp(main_bssid, ap_bssid) != 0 && ap_strength >= threshold) {
+    const char *ap_bssid = nm_access_point_get_bssid(ap);
+    guint8 ap_strength = nm_access_point_get_strength(ap);
+    if (cur_ap != NULL && strcmp(cur_ap_bssid, ap_bssid) != 0 &&
+            ap_strength > cur_ap_strength ||
+        cur_ap == NULL && strcmp(main_bssid, ap_bssid) != 0 &&
+            ap_strength >= threshold) {
       return ap;
     }
   }
 
-  return aps->pdata[0];
+  return cur_ap == NULL ? aps->pdata[0] : NULL;
 }
 
 void dev_states_scan_cb(NMDeviceWifi *device, GAsyncResult *res,
                         DevStates *dev_states) {
   GPtrArray *aps = nm_device_wifi_get_available_aps(device);
+  g_debug("scan completed (%d APs found)", aps->len);
   if (aps->len <= 0) {
     g_ptr_array_unref(aps);
     return;
@@ -135,6 +159,10 @@ void dev_states_scan_cb(NMDeviceWifi *device, GAsyncResult *res,
   NMAccessPoint *cur_ap = nm_device_wifi_get_active_access_point(device);
   NMAccessPoint *ap = dev_states_find_dev_ap(dev_states, device, aps);
   if (ap != NULL && ap != cur_ap) {
+    const char *iface = nm_device_get_iface(device);
+    GBytes *ssid = nm_access_point_get_ssid(ap);
+    g_debug("trying to connect to an AP(iface: %s, ssid: %s)", iface,
+            (char *)g_bytes_get_data(ssid, NULL));
     nm_device_wifi_connect_ap(device, dev_states->client, ap,
                               (GAsyncReadyCallback)connect_ap_cb, dev_states);
   }
@@ -143,6 +171,7 @@ void dev_states_scan_cb(NMDeviceWifi *device, GAsyncResult *res,
 }
 
 void dev_states_request_scan(DevStates *dev_states) {
+  g_debug("scanning");
   for (int i = 0; i < dev_states->devs->len; i++) {
     NMDeviceWifi *device = dev_states->devs->pdata[i];
     nm_device_wifi_request_scan_async(
