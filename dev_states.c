@@ -162,7 +162,10 @@ void dev_states_scan_cb(NMDeviceWifi *device, GAsyncResult *res,
   g_ptr_array_sort(aps, (GCompareFunc)comp_ap_by_strength);
   NMAccessPoint *cur_ap = nm_device_wifi_get_active_access_point(device);
   NMAccessPoint *ap = dev_states_find_dev_ap(dev_states, device, aps);
-  if (ap != NULL && ap != cur_ap) {
+  const char *cur_ap_bssid =
+      cur_ap != NULL ? nm_access_point_get_bssid(cur_ap) : NULL;
+  const char *ap_bssid = ap != NULL ? nm_access_point_get_bssid(ap) : NULL;
+  if (ap != NULL && (cur_ap == NULL || strcmp(cur_ap_bssid, ap_bssid) != 0)) {
     const char *iface = nm_device_get_iface((NMDevice *)device);
     GBytes *ssid = nm_access_point_get_ssid(ap);
     g_debug("trying to connect to an AP(iface: %s, ssid: %s)\n", iface,
