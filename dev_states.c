@@ -150,7 +150,9 @@ NMAccessPoint *dev_states_find_dev_ap(DevStates *dev_states,
 void dev_states_scan_cb(NMDeviceWifi *device, GAsyncResult *res,
                         DevStates *dev_states) {
   GPtrArray *aps = nm_device_wifi_get_available_aps(device);
-  g_debug("scan completed (%d APs found)\n", aps->len);
+  const char *iface = nm_device_get_iface((NMDevice *)device);
+  g_debug("scan completed. %d APs found on the device(iface: %s)\n", aps->len,
+          iface);
   if (aps->len <= 0) {
     g_ptr_array_unref(aps);
     return;
