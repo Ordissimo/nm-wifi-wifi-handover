@@ -45,9 +45,10 @@ static void notify_strength_cb(NMAccessPoint *ap, GParamSpec *spec,
 void dev_states_set_mdev(DevStates *dev_states, NMDeviceWifi *device,
                          int base_strength) {
   NMDeviceWifi *old_mdev = dev_states->mdev;
-  if (old_mdev != NULL) {
-    NMAccessPoint *old_mdev_ap =
-        nm_device_wifi_get_active_access_point(old_mdev);
+  NMAccessPoint *old_mdev_ap =
+      old_mdev != NULL ? nm_device_wifi_get_active_access_point(old_mdev)
+                       : NULL;
+  if (old_mdev_ap != NULL) {
     g_signal_handler_disconnect(old_mdev_ap, dev_states->mdev_handler_id);
   }
 
@@ -66,7 +67,8 @@ void dev_states_check_swap(DevStates *dev_states) {
       dev_states->mdev != NULL
           ? nm_device_wifi_get_active_access_point(dev_states->mdev)
           : NULL;
-  guint8 main_strength = main_ap != NULL ? nm_access_point_get_strength(main_ap) : 0;
+  guint8 main_strength =
+      main_ap != NULL ? nm_access_point_get_strength(main_ap) : 0;
   for (int i = 0; i < dev_states->devs->len; i++) {
     NMDeviceWifi *device = dev_states->devs->pdata[i];
     if (device == dev_states->mdev) {
@@ -79,12 +81,13 @@ void dev_states_check_swap(DevStates *dev_states) {
     }
 
     guint8 strength = nm_access_point_get_strength(ap);
-    if (main_ap == NULL || strength > main_strength && !is_same_ap(main_ap, ap)) {
+    if (main_ap == NULL ||
+        strength > main_strength && !is_same_ap(main_ap, ap)) {
       GBytes *ssid = nm_access_point_get_ssid(ap);
       g_debug(
           "strength of the sdev's AP (ssid: %s, strength: %d) is higher now",
           (char *)g_bytes_get_data(ssid, NULL), strength);
-      dev_states_set_mdev(dev_states, device);
+      dev_states_set_mdev(dev_states, device, strength);
     }
   }
 }
