@@ -1,6 +1,13 @@
 #include "./dev_states.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+static gboolean is_same_ap(NMAccessPoint *a, NMAccessPoint *b) {
+  const char *bssid_a = nm_access_point_get_bssid(a);
+  const char *bssid_b = nm_access_point_get_bssid(b);
+  return strcmp(bssid_a, bssid_b) == 0;
+}
 
 static gint comp_ap_by_strength(gpointer a, gpointer b) {
   NMAccessPoint *ap_a = *(NMAccessPoint **)a;
@@ -19,28 +26,47 @@ static void notify_strength_cb(NMAccessPoint *ap, GParamSpec *spec,
                                DevStates *dev_states) {
   GBytes *ssid = nm_access_point_get_ssid(ap);
   guint8 strength = nm_access_point_get_strength(ap);
-  g_debug("strength of the AP changed(ssid: %s, strength: %d)\n",
+  g_debug("strength of the mdev's AP changed(ssid: %s, strength: %d)",
           (char *)g_bytes_get_data(ssid, NULL), strength);
+
   dev_states_check_swap(dev_states);
 
-  NMAccessPoint *main_ap =
-      dev_states->mdev != NULL
-          ? nm_device_wifi_get_active_access_point(dev_states->mdev)
-          : NULL;
-  if (main_ap == ap && dev_states->init_mdev_ap_strength * 0.8 >= strength) {
-    g_debug("strength of mdev's AP is decreasing\n");
+  // re-scan if diff of strength is larger than the threshold
+  int strength_diff = abs(dev_states->base_mdev_ap_strength - strength);
+  int strength_diff_threshold = 5;
+  if (strength_diff > strength_diff_threshold) {
+    g_debug("change of mdev's AP (ssid: %s) strength is larger than threshold",
+            (char *)g_bytes_get_data(ssid, NULL));
+    dev_states->base_mdev_ap_strength = strength;
     dev_states_request_scan(dev_states);
   }
 }
 
+void dev_states_set_mdev(DevStates *dev_states, NMDeviceWifi *device,
+                         int base_strength) {
+  NMDeviceWifi *old_mdev = dev_states->mdev;
+  if (old_mdev != NULL) {
+    NMAccessPoint *old_mdev_ap =
+        nm_device_wifi_get_active_access_point(old_mdev);
+    g_signal_handler_disconnect(old_mdev_ap, dev_states->mdev_handler_id);
+  }
+
+  dev_states->mdev = device;
+  dev_states->base_mdev_ap_strength = base_strength;
+  dev_states->mdev_handler_id = g_signal_connect(
+      ap, "notify::strength", (GCallback)notify_strength_cb, dev_states);
+
+  const char *iface = nm_device_get_iface((NMDevice *)device);
+  g_debug("mdev is changed to the device(iface: %s)", iface);
+}
+
 void dev_states_check_swap(DevStates *dev_states) {
-  g_debug("checking whether need to swap device role\n");
+  g_debug("checking whether need to swap device role");
   NMAccessPoint *main_ap =
       dev_states->mdev != NULL
           ? nm_device_wifi_get_active_access_point(dev_states->mdev)
           : NULL;
-  guint8 main_strength =
-      main_ap != NULL ? nm_access_point_get_strength(main_ap) : 0;
+  guint8 main_strength = main_ap != NULL ? nm_access_point_get_strength(main_ap) : 0;
   for (int i = 0; i < dev_states->devs->len; i++) {
     NMDeviceWifi *device = dev_states->devs->pdata[i];
     if (device == dev_states->mdev) {
@@ -53,25 +79,12 @@ void dev_states_check_swap(DevStates *dev_states) {
     }
 
     guint8 strength = nm_access_point_get_strength(ap);
-    GBytes *ssid = nm_access_point_get_ssid(ap);
-    if (strength > main_strength) {
+    if (main_ap == NULL || strength > main_strength && !is_same_ap(main_ap, ap)) {
+      GBytes *ssid = nm_access_point_get_ssid(ap);
       g_debug(
-          "strength of the sdev's AP (ssid: %s, strength: %d) is higher now\n",
+          "strength of the sdev's AP (ssid: %s, strength: %d) is higher now",
           (char *)g_bytes_get_data(ssid, NULL), strength);
-      NMDeviceWifi *old_mdev = dev_states->mdev;
-      if (old_mdev != NULL) {
-        NMAccessPoint *old_mdev_ap =
-            nm_device_wifi_get_active_access_point(old_mdev);
-        g_signal_handler_disconnect(old_mdev_ap, dev_states->mdev_handler_id);
-      }
-
-      dev_states->mdev = device;
-      dev_states->init_mdev_ap_strength = strength;
-      dev_states->mdev_handler_id =
-          g_signal_connect(ap, "notify::strength",
-                           (GCallback)notify_strength_cb, dev_states);
-      const char *iface = nm_device_get_iface((NMDevice *)device);
-      g_debug("mdev is changed to the device(iface: %s)\n", iface);
+      dev_states_set_mdev(dev_states, device);
     }
   }
 }
@@ -125,21 +138,17 @@ NMAccessPoint *dev_states_find_dev_ap(DevStates *dev_states,
   NMAccessPoint *cur_ap = nm_device_wifi_get_active_access_point(device);
   guint8 cur_ap_strength =
       cur_ap != NULL ? nm_access_point_get_strength(cur_ap) : 0;
-  const char *cur_ap_bssid =
-      cur_ap != NULL ? nm_access_point_get_bssid(cur_ap) : NULL;
 
   // calc threshold
   NMAccessPoint *main_ap =
       nm_device_wifi_get_active_access_point(dev_states->mdev);
   guint8 threshold = nm_access_point_get_strength(main_ap) * 0.8;
-  const char *main_bssid = nm_access_point_get_bssid(main_ap);
   for (int i = 0; i < aps->len; i++) {
     NMAccessPoint *ap = aps->pdata[i];
-    const char *ap_bssid = nm_access_point_get_bssid(ap);
     guint8 ap_strength = nm_access_point_get_strength(ap);
-    if (cur_ap != NULL && strcmp(cur_ap_bssid, ap_bssid) != 0 &&
+    if (cur_ap != NULL && !is_same_ap(cur_ap, ap) &&
             ap_strength > cur_ap_strength ||
-        cur_ap == NULL && strcmp(main_bssid, ap_bssid) != 0 &&
+        cur_ap == NULL && !is_same_ap(main_ap, ap) &&
             ap_strength >= threshold) {
       return ap;
     }
@@ -152,25 +161,17 @@ void dev_states_scan_cb(NMDeviceWifi *device, GAsyncResult *res,
                         DevStates *dev_states) {
   GPtrArray *aps = nm_device_wifi_get_available_aps(device);
   const char *iface = nm_device_get_iface((NMDevice *)device);
-  g_debug("scan completed. %d APs found on the device(iface: %s)\n", aps->len,
-          iface);
-  if (aps->len <= 0) {
-    g_ptr_array_unref(aps);
-    return;
-  }
+  g_debug("%d APs found on the device(iface: %s)", aps->len, iface);
 
-  // sort APs by strength
+  // connect if AP which has higher strength is found
   g_ptr_array_sort(aps, (GCompareFunc)comp_ap_by_strength);
-  NMAccessPoint *cur_ap = nm_device_wifi_get_active_access_point(device);
   NMAccessPoint *ap = dev_states_find_dev_ap(dev_states, device, aps);
-  const char *cur_ap_bssid =
-      cur_ap != NULL ? nm_access_point_get_bssid(cur_ap) : NULL;
-  const char *ap_bssid = ap != NULL ? nm_access_point_get_bssid(ap) : NULL;
-  if (ap != NULL && (cur_ap == NULL || strcmp(cur_ap_bssid, ap_bssid) != 0)) {
+  if (ap != NULL) {
     const char *iface = nm_device_get_iface((NMDevice *)device);
     GBytes *ssid = nm_access_point_get_ssid(ap);
-    g_debug("trying to connect to an AP(iface: %s, ssid: %s)\n", iface,
+    g_debug("trying to connect to an AP(iface: %s, ssid: %s)", iface,
             (char *)g_bytes_get_data(ssid, NULL));
+
     nm_device_wifi_connect_ap(device, dev_states->client, ap,
                               (GAsyncReadyCallback)connect_ap_cb, dev_states);
   }
@@ -179,7 +180,7 @@ void dev_states_scan_cb(NMDeviceWifi *device, GAsyncResult *res,
 }
 
 void dev_states_request_scan(DevStates *dev_states) {
-  g_debug("scanning\n");
+  g_debug("scanning");
   for (int i = 0; i < dev_states->devs->len; i++) {
     NMDeviceWifi *device = dev_states->devs->pdata[i];
     nm_device_wifi_request_scan_async(

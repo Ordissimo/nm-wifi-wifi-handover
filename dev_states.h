@@ -7,7 +7,7 @@ typedef struct {
   NMDeviceWifi *mdev;
   GPtrArray *devs;
   NMClient *client;
-  guint8 init_mdev_ap_strength;
+  guint8 base_mdev_ap_strength;
   gulong mdev_handler_id;
 } DevStates;
 
