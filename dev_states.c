@@ -19,7 +19,7 @@ static gint comp_ap_by_strength(gpointer a, gpointer b) {
 
 static void connect_ap_cb(NMClient *client, GAsyncResult *res,
                           DevStates *dev_states) {
-  dev_states_check_swap(dev_states);
+  dev_states_check_role(dev_states);
 }
 
 static void notify_strength_cb(NMAccessPoint *ap, GParamSpec *spec,
@@ -29,7 +29,7 @@ static void notify_strength_cb(NMAccessPoint *ap, GParamSpec *spec,
   g_debug("strength of the mdev's AP changed(ssid: %s, strength: %d)",
           (char *)g_bytes_get_data(ssid, NULL), strength);
 
-  dev_states_check_swap(dev_states);
+  dev_states_check_role(dev_states);
 
   // re-scan if diff of strength is larger than the threshold
   int strength_diff = abs(dev_states->base_mdev_ap_strength - strength);

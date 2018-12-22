@@ -20,7 +20,7 @@ void nm_device_wifi_connect_ap(NMDeviceWifi *device, NMClient *client,
 
 GPtrArray *nm_device_wifi_get_available_aps(NMDeviceWifi *device);
 
-void dev_states_check_swap(DevStates *dev_states);
+void dev_states_check_role(DevStates *dev_states);
 
 void dev_states_scan_cb(NMDeviceWifi *device, GAsyncResult *res,
                         DevStates *dev_states);
