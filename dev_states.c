@@ -145,7 +145,8 @@ NMAccessPoint *dev_states_find_dev_ap(DevStates *dev_states,
   // calc threshold
   NMAccessPoint *main_ap =
       nm_device_wifi_get_active_access_point(dev_states->mdev);
-  guint8 threshold = nm_access_point_get_strength(main_ap) * 0.8;
+  guint8 threshold =
+      main_ap != NULL ? nm_access_point_get_strength(main_ap) * 0.8 : 0;
   for (int i = 0; i < aps->len; i++) {
     NMAccessPoint *ap = aps->pdata[i];
     guint8 ap_strength = nm_access_point_get_strength(ap);
