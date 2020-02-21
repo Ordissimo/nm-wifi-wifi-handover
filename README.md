@@ -5,8 +5,8 @@ Acquire the strength of the AP and automatically switch the AP to connect to.
 ## AP switching mechanism
 
 1. When scanning is completed, determine the AP to which the NIC is connected according to the following procedure.
-  1.1. main NIC If is not connected, connect to the one with strong signal strength
-  1.2. Determine the threshold of signal strength
+  1.1. main NIC If is not connected, connect to the one with strong signal strength.
+  1.2. Determine the threshold of signal strength.
   1.3. 対象NICがAPに接続済みの場合，より電波強度の高い別のAPがあれば，そのAPを選択
   1.4. 対象NICがAPに未接続の場合，電波強度が閾値以上かつ，main NICが接続していないものがあれば選択
   1.5. この時点でAP選択が選択されておらず，NICがAPに未接続の場合，電波強度が一番高いものを選択
