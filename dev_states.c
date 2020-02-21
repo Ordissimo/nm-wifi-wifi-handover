@@ -61,7 +61,7 @@ void dev_states_set_mdev(DevStates *dev_states, NMDeviceWifi *device,
   g_debug("mdev is changed to the device(iface: %s)", iface);
 }
 
-void dev_states_check_swap(DevStates *dev_states) {
+void dev_states_check_role(DevStates *dev_states) {
   g_debug("checking whether need to swap device role");
   NMAccessPoint *main_ap =
       dev_states->mdev != NULL
